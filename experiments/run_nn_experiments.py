@@ -1,77 +1,118 @@
 import numpy as np
+import pandas as pd
+
+from algorithms.pso import PSO
+from algorithms.ga import GA
+from algorithms.hybrid_pso_ga import HybridPSO_GA
+from problems.neural_network_training import nn_fitness, TOTAL_WEIGHTS, evaluate_on_test
+from utils.plotting import plot_convergence, plot_boxplot, plot_histograms
 
 
-class PSO:
-    """
-    Implementación básica de Particle Swarm Optimization (PSO)
-    para minimización de una función objetivo.
-    """
+def run_nn_experiments(
+    n_runs=20,
+    bounds=(-1.0, 1.0),
+    max_iter=80
+):
+    dim = TOTAL_WEIGHTS
 
-    def __init__(
-        self,
-        fitness_function,
-        dim,
-        n_particles=30,
-        max_iter=100,
-        w=0.7,
-        c1=1.5,
-        c2=1.5,
-        bounds=(-1.0, 1.0),
-    ):
-        self.fitness_function = fitness_function
-        self.dim = dim
-        self.n_particles = n_particles
-        self.max_iter = max_iter
-        self.w = w
-        self.c1 = c1
-        self.c2 = c2
-        self.bounds = bounds
+    results_pso = []
+    results_ga = []
+    results_hybrid = []
 
-        low, high = bounds
-        self.positions = np.random.uniform(low, high, (n_particles, dim))
-        self.velocities = np.zeros((n_particles, dim))
+    curves_pso = []
+    curves_ga = []
+    curves_hybrid = []
 
-        self.pbest = self.positions.copy()
-        self.pbest_fitness = np.array(
-            [self.fitness_function(p) for p in self.positions]
+    test_acc_best_pso = []
+    test_acc_best_ga = []
+    test_acc_best_hybrid = []
+
+    for _ in range(n_runs):
+        pso = PSO(
+            fitness_function=nn_fitness,
+            dim=dim,
+            n_particles=30,
+            max_iter=max_iter,
+            bounds=bounds,
         )
+        best_pso, fit_pso, curve_pso = pso.optimize()
 
-        best_idx = np.argmin(self.pbest_fitness)
-        self.gbest = self.positions[best_idx].copy()
-        self.gbest_fitness = self.pbest_fitness[best_idx]
+        ga = GA(
+            fitness_function=nn_fitness,
+            dim=dim,
+            pop_size=40,
+            max_iter=max_iter,
+            bounds=bounds,
+        )
+        best_ga, fit_ga, curve_ga = ga.optimize()
 
-        self.convergence_curve = []
+        hybrid = HybridPSO_GA(
+            fitness_function=nn_fitness,
+            dim=dim,
+            bounds=bounds,
+            pso_iter=max_iter // 2,
+            ga_iter=max_iter // 2,
+        )
+        best_h, fit_h, curve_h = hybrid.optimize()
 
-    def optimize(self):
-        for _ in range(self.max_iter):
-            r1 = np.random.rand(self.n_particles, self.dim)
-            r2 = np.random.rand(self.n_particles, self.dim)
+        results_pso.append(fit_pso)
+        results_ga.append(fit_ga)
+        results_hybrid.append(fit_h)
 
-            cognitive = self.c1 * r1 * (self.pbest - self.positions)
-            social = self.c2 * r2 * (self.gbest - self.positions)
+        curves_pso.append(curve_pso)
+        curves_ga.append(curve_ga)
+        curves_hybrid.append(curve_h)
 
-            self.velocities = self.w * self.velocities + cognitive + social
-            self.positions = self.positions + self.velocities
+        # Evaluar en test set la mejor solución de cada algoritmo
+        test_acc_best_pso.append(evaluate_on_test(best_pso))
+        test_acc_best_ga.append(evaluate_on_test(best_ga))
+        test_acc_best_hybrid.append(evaluate_on_test(best_h))
 
-            # Respetar límites
-            low, high = self.bounds
-            self.positions = np.clip(self.positions, low, high)
+    # Guardar CSV
+    df = pd.DataFrame({
+        "PSO_fitness": results_pso,
+        "GA_fitness": results_ga,
+        "Hybrid_fitness": results_hybrid,
+        "PSO_test_acc": test_acc_best_pso,
+        "GA_test_acc": test_acc_best_ga,
+        "Hybrid_test_acc": test_acc_best_hybrid,
+    })
+    df.to_csv("results_nn.csv", index=False)
 
-            fitness_vals = np.array(
-                [self.fitness_function(p) for p in self.positions]
-            )
+    def stats(arr):
+        return {
+            "min": float(np.min(arr)),
+            "max": float(np.max(arr)),
+            "mean": float(np.mean(arr)),
+            "median": float(np.median(arr)),
+            "std": float(np.std(arr)),
+        }
 
-            # Actualizar pbest
-            improved = fitness_vals < self.pbest_fitness
-            self.pbest[improved] = self.positions[improved]
-            self.pbest_fitness[improved] = fitness_vals[improved]
+    print("== Neural Network - Estadísticos (fitness) ==")
+    print("PSO:", stats(results_pso))
+    print("GA:", stats(results_ga))
+    print("Hybrid:", stats(results_hybrid))
 
-            # Actualizar gbest
-            best_idx = np.argmin(fitness_vals)
-            if fitness_vals[best_idx] < self.gbest_fitness:
-                self.gbest_fitness = fitness_vals[best_idx]
-                self.gbest = self.positions[best_idx].copy()
+    print("== Neural Network - Estadísticos (accuracy test) ==")
+    print("PSO test acc:", stats(test_acc_best_pso))
+    print("GA test acc:", stats(test_acc_best_ga))
+    print("Hybrid test acc:", stats(test_acc_best_hybrid))
 
-            self.convergence_curve.append(self.gbest_fitness)
+    # Gráficas
+    plot_convergence(
+        [curves_pso[0], curves_ga[0], curves_hybrid[0]],
+        ["PSO", "GA", "Hybrid PSO-GA"],
+        title="Curvas de convergencia - Red Neuronal",
+    )
 
-        return self.gbest, self.gbest_fitness, self.convergence_curve
+    plot_boxplot(
+        [results_pso, results_ga, results_hybrid],
+        ["PSO", "GA", "Hybrid"],
+        title="Boxplot - NN (fitness)",
+    )
+
+    plot_histograms(
+        [results_pso, results_ga, results_hybrid],
+        ["PSO", "GA", "Hybrid"],
+        title="Histogramas - NN (fitness)",
+    )
