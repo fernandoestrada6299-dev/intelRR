@@ -1,3 +1,7 @@
+"""
+Módulo para ejecutar experimentos del entrenamiento de redes neuronales usando PSO, GA y un enfoque híbrido PSO–GA. Realiza múltiples corridas, calcula métricas, guarda resultados y genera gráficas comparativas.
+"""
+
 import numpy as np
 import pandas as pd
 
@@ -13,8 +17,28 @@ def run_nn_experiments(
     bounds=(-1.0, 1.0),
     max_iter=80
 ):
+    """
+    Ejecuta múltiples experimentos de optimización del entrenamiento de una red neuronal mediante PSO, GA y Hybrid PSO–GA.
+
+    Parámetros:
+    - n_runs: número de corridas independientes.
+    - bounds: límites mínimos y máximos para los pesos de la red neuronal.
+    - max_iter: número máximo de iteraciones por algoritmo.
+
+    Proceso:
+    1. Ejecuta los tres algoritmos n_runs veces.
+    2. Registra el mejor fitness, curvas de convergencia y accuracies en test.
+    3. Guarda resultados en CSV.
+    4. Imprime estadísticos en consola.
+    5. Genera gráficas de convergencia, boxplot e histogramas.
+
+    Retorna:
+    Nada. La función se utiliza con fines experimentales.
+    """
+    # Dimensión del vector de pesos de la red neuronal
     dim = TOTAL_WEIGHTS
 
+    # Listas para almacenar los resultados de fitness y curvas de convergencia
     results_pso = []
     results_ga = []
     results_hybrid = []
@@ -27,7 +51,9 @@ def run_nn_experiments(
     test_acc_best_ga = []
     test_acc_best_hybrid = []
 
+    # Bucle principal: ejecutar múltiples corridas independientes
     for _ in range(n_runs):
+        # Ejecutar PSO
         pso = PSO(
             fitness_function=nn_fitness,
             dim=dim,
@@ -37,6 +63,7 @@ def run_nn_experiments(
         )
         best_pso, fit_pso, curve_pso = pso.optimize()
 
+        # Ejecutar GA
         ga = GA(
             fitness_function=nn_fitness,
             dim=dim,
@@ -46,6 +73,7 @@ def run_nn_experiments(
         )
         best_ga, fit_ga, curve_ga = ga.optimize()
 
+        # Ejecutar algoritmo híbrido PSO–GA
         hybrid = HybridPSO_GA(
             fitness_function=nn_fitness,
             dim=dim,
@@ -63,12 +91,12 @@ def run_nn_experiments(
         curves_ga.append(curve_ga)
         curves_hybrid.append(curve_h)
 
-        # Evaluar en test set la mejor solución de cada algoritmo
+        # Evaluar la mejor solución encontrada en el conjunto de prueba
         test_acc_best_pso.append(evaluate_on_test(best_pso))
         test_acc_best_ga.append(evaluate_on_test(best_ga))
         test_acc_best_hybrid.append(evaluate_on_test(best_h))
 
-    # Guardar CSV
+    # Guardar resultados en archivo CSV
     df = pd.DataFrame({
         "PSO_fitness": results_pso,
         "GA_fitness": results_ga,
@@ -79,6 +107,7 @@ def run_nn_experiments(
     })
     df.to_csv("results_nn.csv", index=False)
 
+    # Función auxiliar para calcular estadísticos
     def stats(arr):
         return {
             "min": float(np.min(arr)),
@@ -88,6 +117,7 @@ def run_nn_experiments(
             "std": float(np.std(arr)),
         }
 
+    # Imprimir estadísticas de fitness y accuracy
     print("== Neural Network - Estadísticos (fitness) ==")
     print("PSO:", stats(results_pso))
     print("GA:", stats(results_ga))
@@ -98,19 +128,21 @@ def run_nn_experiments(
     print("GA test acc:", stats(test_acc_best_ga))
     print("Hybrid test acc:", stats(test_acc_best_hybrid))
 
-    # Gráficas
+    # Gráfica de convergencia
     plot_convergence(
         [curves_pso[0], curves_ga[0], curves_hybrid[0]],
         ["PSO", "GA", "Hybrid PSO-GA"],
         title="Curvas de convergencia - Red Neuronal",
     )
 
+    # Gráfica boxplot
     plot_boxplot(
         [results_pso, results_ga, results_hybrid],
         ["PSO", "GA", "Hybrid"],
         title="Boxplot - NN (fitness)",
     )
 
+    # Gráfica de histogramas
     plot_histograms(
         [results_pso, results_ga, results_hybrid],
         ["PSO", "GA", "Hybrid"],

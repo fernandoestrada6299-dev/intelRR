@@ -1,3 +1,7 @@
+"""
+Módulo para ejecutar experimentos del problema de asignación de recursos en la nube (Cloud Allocation) utilizando los algoritmos PSO, GA y un enfoque híbrido PSO–GA. Este script ejecuta múltiples corridas, recolecta métricas, guarda resultados en CSV y genera gráficas comparativas.
+"""
+
 import numpy as np
 import pandas as pd
 
@@ -14,6 +18,26 @@ def run_cloud_experiments(
     bounds=(0.01, 1.0),
     max_iter=100
 ):
+    """
+    Ejecuta experimentos repetidos del problema Cloud Allocation.
+
+    Parámetros:
+    - n_runs: número de corridas independientes.
+    - dim: número de dimensiones del problema.
+    - bounds: límites mínimos y máximos para cada variable.
+    - max_iter: número máximo de iteraciones por algoritmo.
+
+    Proceso:
+    1. Ejecuta PSO, GA y Hybrid PSO–GA n_runs veces.
+    2. Almacena el mejor fitness de cada ejecución.
+    3. Guarda un archivo CSV con todos los resultados.
+    4. Imprime estadísticos básicos en consola.
+    5. Genera gráficas: curvas de convergencia, boxplot e histogramas.
+
+    Retorna:
+    Nada. La función se utiliza con fines experimentales.
+    """
+    # Listas para almacenar los resultados de fitness y curvas de convergencia
     results_pso = []
     results_ga = []
     results_hybrid = []
@@ -22,7 +46,9 @@ def run_cloud_experiments(
     curves_ga = []
     curves_hybrid = []
 
+    # Bucle principal: repetimos las corridas independientes
     for _ in range(n_runs):
+        # Ejecutar PSO
         pso = PSO(
             fitness_function=cloud_fitness,
             dim=dim,
@@ -32,6 +58,7 @@ def run_cloud_experiments(
         )
         _, fit_pso, curve_pso = pso.optimize()
 
+        # Ejecutar GA
         ga = GA(
             fitness_function=cloud_fitness,
             dim=dim,
@@ -41,6 +68,7 @@ def run_cloud_experiments(
         )
         _, fit_ga, curve_ga = ga.optimize()
 
+        # Ejecutar algoritmo híbrido PSO–GA
         hybrid = HybridPSO_GA(
             fitness_function=cloud_fitness,
             dim=dim,
@@ -50,6 +78,7 @@ def run_cloud_experiments(
         )
         _, fit_h, curve_h = hybrid.optimize()
 
+        # Guardar fitness y curva de esta corrida
         results_pso.append(fit_pso)
         results_ga.append(fit_ga)
         results_hybrid.append(fit_h)
@@ -58,7 +87,7 @@ def run_cloud_experiments(
         curves_ga.append(curve_ga)
         curves_hybrid.append(curve_h)
 
-    # Guardar CSV
+    # Guardar resultados en archivo CSV
     df = pd.DataFrame({
         "PSO": results_pso,
         "GA": results_ga,
@@ -66,7 +95,7 @@ def run_cloud_experiments(
     })
     df.to_csv("results_cloud.csv", index=False)
 
-    # Estadísticos básicos en consola
+    # Función auxiliar para calcular estadísticos
     def stats(arr):
         return {
             "min": float(np.min(arr)),
@@ -76,24 +105,27 @@ def run_cloud_experiments(
             "std": float(np.std(arr)),
         }
 
+    # Estadísticos básicos en consola
     print("== Cloud Allocation - Estadísticos ==")
     print("PSO:", stats(results_pso))
     print("GA:", stats(results_ga))
     print("Hybrid:", stats(results_hybrid))
 
-    # Gráficas (usamos la primera corrida de cada uno como representativa de convergencia)
+    # Gráfica de convergencia
     plot_convergence(
         [curves_pso[0], curves_ga[0], curves_hybrid[0]],
         ["PSO", "GA", "Hybrid PSO-GA"],
         title="Curvas de convergencia - Cloud Allocation",
     )
 
+    # Gráfica boxplot
     plot_boxplot(
         [results_pso, results_ga, results_hybrid],
         ["PSO", "GA", "Hybrid"],
         title="Boxplot - Cloud Allocation",
     )
 
+    # Gráfica de histogramas
     plot_histograms(
         [results_pso, results_ga, results_hybrid],
         ["PSO", "GA", "Hybrid"],

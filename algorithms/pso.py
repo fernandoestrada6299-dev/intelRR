@@ -1,10 +1,14 @@
+"""
+Módulo que implementa el algoritmo Particle Swarm Optimization (PSO) para la minimización de funciones objetivo continuas. El método utiliza un conjunto de partículas que se desplazan por el espacio de búsqueda guiadas por su experiencia individual y colectiva.
+"""
+
 import numpy as np
 
 
 class PSO:
     """
-    Implementación básica de Particle Swarm Optimization (PSO)
-    para minimización de una función objetivo.
+    Clase PSO:
+    Implementa el algoritmo Particle Swarm Optimization para optimización continua en problemas de minimización. Incluye componentes de inercia, atracción cognitiva y atracción social, además de un manejo automático de límites mediante clipping.
     """
 
     def __init__(
@@ -18,6 +22,19 @@ class PSO:
         c2=1.5,
         bounds=(-1.0, 1.0),
     ):
+        """
+        Inicializa los parámetros del algoritmo PSO.
+
+        Parámetros:
+        - fitness_function: función objetivo a minimizar.
+        - dim: número de dimensiones del vector solución.
+        - n_particles: cantidad de partículas en el enjambre.
+        - max_iter: número máximo de iteraciones.
+        - w: coeficiente de inercia del movimiento.
+        - c1: coeficiente cognitivo (influencia del mejor personal).
+        - c2: coeficiente social (influencia del mejor global).
+        - bounds: tupla (min, max) que define los límites permitidos para cada variable.
+        """
         self.fitness_function = fitness_function
         self.dim = dim
         self.n_particles = n_particles
@@ -43,17 +60,36 @@ class PSO:
         self.convergence_curve = []
 
     def optimize(self):
+        """
+        Ejecuta el ciclo completo de optimización PSO.
+
+        En cada iteración:
+        1. Actualiza las velocidades usando los términos de inercia, cognitivo y social.
+        2. Actualiza posiciones de las partículas.
+        3. Aplica clipping para respetar los límites del dominio.
+        4. Evalúa la función objetivo.
+        5. Actualiza los mejores valores personales y globales.
+        6. Almacena la curva de convergencia.
+
+        Retorna:
+        - gbest: mejor solución encontrada.
+        - gbest_fitness: mejor fitness obtenido.
+        - convergence_curve: lista con la evolución del mejor fitness por iteración.
+        """
         for _ in range(self.max_iter):
+            # Coeficientes aleatorios para los términos cognitivo y social
             r1 = np.random.rand(self.n_particles, self.dim)
             r2 = np.random.rand(self.n_particles, self.dim)
 
+            # Cálculo de los términos cognitivo y social que guían el movimiento de las partículas
             cognitive = self.c1 * r1 * (self.pbest - self.positions)
             social = self.c2 * r2 * (self.gbest - self.positions)
 
+            # Ecuación principal de actualización de velocidades: inercia + atracción cognitiva + atracción social
             self.velocities = self.w * self.velocities + cognitive + social
             self.positions = self.positions + self.velocities
 
-            # Respetar límites
+            # Respetar límites para evitar que las partículas salgan del dominio permitido
             low, high = self.bounds
             self.positions = np.clip(self.positions, low, high)
 
@@ -61,12 +97,11 @@ class PSO:
                 [self.fitness_function(p) for p in self.positions]
             )
 
-            # Actualizar pbest
+            # Actualizar mejores personales (pbest) y global (gbest) según los valores de fitness obtenidos
             improved = fitness_vals < self.pbest_fitness
             self.pbest[improved] = self.positions[improved]
             self.pbest_fitness[improved] = fitness_vals[improved]
 
-            # Actualizar gbest
             best_idx = np.argmin(fitness_vals)
             if fitness_vals[best_idx] < self.gbest_fitness:
                 self.gbest_fitness = fitness_vals[best_idx]
